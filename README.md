@@ -97,9 +97,9 @@ To be able to deploy to the NAS, we will need to do the following operations:
 
 
 ## Deployment PowerShell script
-TODO :D
+The deployment script is located under the _Build_ folder and is called _build.ps1_.
 
-For the image version, the script uses the web api project version.
+This file is self documented and contains all the tasks necessary to complete the deployment process.
 
 To generate a random mac address I use [this tool](https://justynshull.com/macgen/macgen.php).
 

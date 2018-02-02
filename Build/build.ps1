@@ -1,27 +1,43 @@
 properties {
+	# Name of the container
 	$containerName = "QnapDockerCoreApi"
+	# Name of the image
 	$imageName = "webapi"
+	# Host name of the container, based on the network configuration this can be used to access the container from the LAN (eg http://api/...)
 	$hostname = "api"
+	# MAC address, this must be unique in the LAN, can be generated on-line and is useful for DHCP reservation
 	$containerMacAddress = "00:0C:29:E8:24:F4"
+	# Static IP Address assigned to the container
 	$containerIpAddress = "192.168.0.142"
+	# Gateway address, normally the Router
 	$gatewayIpAddress = "192.168.0.1"
+	# Subnet used to configure the docker network
 	$subnet = "192.168.0.0/24"
+	# Base directory
 	$baseDir = resolve-path .\..\
+	# Source directory
     $srcDir = $baseDir
+	# Solution file path
     $solution = Join-Path $baseDir "\Application.sln"
+	# Project directory, refers to the master project that will be published and executed
 	$projectDir = Join-Path $srcDir "\Application.Api"
+	# Project file path
 	$project = Join-Path  $projectDir "\Application.Api.csproj"
-	$buildDir = Join-Path  $baseDir "Build"
+	# Publish directory where all the published are stored, this is used to build the image 
 	$publishDir = Join-Path $baseDir "\obj\Docker\publish"
-	$imageDestinationDir = ".\DockerImage"
+	# Dockerfile file path, used to build the image
 	$dockerfile = Join-Path $projectDir "\Dockerfile"
-	$projBaseDir = resolve-path .\..\
+	# Build configuration	
     $buildConfiguration = "Release"
+	# URI to access the NAS Docker Server instance
 	$containerUrl = "tcp://nas.home:2376"
+	# Log Volume, used to store logs outside the container in a shared folder accessible from the LAN
 	$logsVolumePath = "/share/Container/Logs"
+	# Flag Local can be used to ignore the NAS deployment, if true, the image and the container will be created in the local Docker Server
 	$local = $false
 }
 
+# By default show the help
 task default -depends help
 
 # Builds, create the image, uploads it
@@ -78,13 +94,17 @@ task get-version {
 	
 	[xml]$xml =  Get-Content $project
 	$script:buildversion = Select-Xml "child::Project/PropertyGroup/Version" $xml
+	
+	if([string]::IsNullOrEmpty($script:buildversion)) {
+		LogError("Unable to determine the version, the project file does not contain the version")
+	}
+	
 	Exec { "API version " + $script:buildversion }
 }
 
 # Generate the solution publishing folder
 task publish-solution -depends build {
 	Log("Generating publish folder")
-	Write-Host $publishDir
     Exec { dotnet publish --output $publishDir $project -c $buildConfiguration }
 }
 
@@ -95,10 +115,6 @@ task generate-image -depends remove-image, publish-solution, get-version {
 		if($local) {
 			docker build -f $dockerfile -t $imageName":"$script:buildversion $baseDir 
 		} else {
-			Write-Host $dockerfile
-			Write-Host $imageName
-			Write-Host $script:buildversion
-			Write-Host $baseDir
 			docker --tls -H="$containerUrl" build -f $dockerfile -t $imageName":"$script:buildversion $baseDir 
 		}		
 	}
@@ -197,7 +213,7 @@ task remove-containers -depends stop-containers {
 	}
 }
 
-# Create the network used by the container
+# Create the network used by the container, if not in local deployment
 task create-container-network -precondition { return -Not $local } {
 	Log("Create the network used by the container")
 	Exec {
@@ -276,6 +292,15 @@ function Log ($msg)
 	write-host ""
 }
 
+# Helper function to log errors and terminate the execution of the script
+function LogError ($msg)
+{
+	write-host ""
+	write-host $msg -foreground "Red"
+	write-host ""
+	throw ""
+}
+
 # Check that docker is running on target machine
 task check-docker-running -depends force-docker-api-nas {
 
@@ -285,8 +310,7 @@ task check-docker-running -depends force-docker-api-nas {
 	}
 	Catch
 	{
-		Log("Docker is not running in the local machine")
-		break
+		LogError("Docker is not running in the local machine")
 	}    
 	
 	Try
@@ -297,7 +321,6 @@ task check-docker-running -depends force-docker-api-nas {
 	}
 	Catch
 	{
-		Log("Unable to access Docker on target machine, check that docker is running and that the url is correct")
-		break
+		LogError("Unable to access Docker on target machine, check that docker is running and that the url is correct")
 	}    
 }
