@@ -124,3 +124,24 @@ If you want to see which other tasks are available, check the content of the bui
 Now browse the following url, to view the Values controller result:
 
 `http://192.168.0.142/api/values `
+
+
+## How to keep the project able to debug local on docker server
+Changing the Dockerfile to be compatible with the QNAP Docker Server, will cause your local Docker debug profile to fail to start.
+
+The reason is that we are not constructing the image correctly anymore and the solution to this problem is quite simple.
+
+1) Rename the original Dockerfile and name it DockerfileLocalDebug
+2) Open the docker-compose.yml file whitin the docker-compose project and make sure the reference to the dockerfile is correctly pointing to the file renamed at the previous step:
+
+```
+version: '3'
+
+services:
+  api:
+    image: api
+    build:
+      context: .
+      dockerfile: Application.Api/DockerfileLocalDebug
+
+```
