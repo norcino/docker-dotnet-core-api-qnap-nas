@@ -41,7 +41,7 @@ properties {
 task default -depends help
 
 # Builds, create the image, uploads it
-task publish -depends check-docker-running, build, generate-image, create-container, start-container
+task publish -depends check-docker-running, generate-image, create-container, start-container
 
 task help {
 	Exec { echo "" }
@@ -49,10 +49,7 @@ task help {
 	Exec { echo "" }
 	Exec { echo "invoke-psake .\build.ps1 {task_name}" }
 	Exec { echo "Use -properties @{local=$true} to override properties of the script" }
-	Exec { echo "build:							Clean the solution, restores the nuget packages and builds the solution" }
-	Exec { echo "publish:						Publishes the API"}	
-	Exec { echo "clean:							Clean the solution"}
-	Exec { echo "restore:						Restores nuget packages"}
+	Exec { echo "publish:						Publishes the API creating the container"}	
 	Exec { echo "generate-image:				If the image exists already with the same tag it is removed, then builds and publishes the solution and then Generates the image using the published content"}
 	Exec { echo "stop-containers:				Stop all the remote containers using the image"}
 	Exec { echo "start-container:				Start the newly created container"}
@@ -61,7 +58,6 @@ task help {
 	Exec { echo "remove-containers:				Stops and Remove all the remote containers with the same name"}	
 	Exec { echo "remove-image:					Remove existing image with the same tag"}
 	Exec { echo "remove-images:					Removes all the remote images with the same name"}
-	Exec { echo "publish-solution:				Build the solution and generates the solution publishing folder"}	
 	Exec { echo "get-version:					Get the API version from project file"}	
 	Exec { echo "create-container-network:		If doesn't exist, create the network used by all containers in the NAS"}	
 }
@@ -69,24 +65,6 @@ task help {
 # 
 # ---------------------------------------------------------------------------------------------------------
 #
-
-# Clean the solution
-task clean {
-	Log("Cleaning API build")
-    Exec { dotnet clean -c $buildConfiguration $solution }
-}
-
-# Clean the solution, restores the nuget packages and builds the solution
-task build -depends clean, restore {
-	Log("Building API application")
-    Exec { dotnet build -c $buildConfiguration $solution }
-}
-
-# Restores nuget packages
-task restore {
-	Log("Restoring API source packages")
-    Exec { dotnet restore $solution }
-}
 
 # Get the API version from project file
 task get-version {
@@ -102,14 +80,8 @@ task get-version {
 	Exec { "API version " + $script:buildversion }
 }
 
-# Generate the solution publishing folder
-task publish-solution -depends build {
-	Log("Generating publish folder")
-    Exec { dotnet publish --output $publishDir $project -c $buildConfiguration }
-}
-
 # If the image exists already with the same tag it is removed, then builds and publishes the solution and then Generates the image using the published content
-task generate-image -depends remove-image, publish-solution, get-version {
+task generate-image -depends remove-image, get-version {
 	Log("Building docker image")
     Exec { 
 		if($local) {
@@ -135,7 +107,7 @@ task stop-containers {
 }
 
 # Remove existing image with the same tag
-task remove-image -depends force-docker-api-nas, remove-containers, get-version {
+task remove-image -depends remove-containers, get-version {
 	Log("Removing existing docker image $($imageName):$($script:buildversion)")
 	Exec {
 		if($local) {
@@ -272,12 +244,6 @@ task create-container -depends get-version, remove-containers, create-container-
 	}
 }
 
-# Overrides the local docker API version to be compatible with the remote server's version
-task force-docker-api-nas -precondition { return -Not $local } {
-	Log("Forcing docker client API to version 1.23")
-	Exec { $env:DOCKER_API_VERSION = 1.23 }
-}
-
 #
 # ---------------------------------------------------------------------------------------------------------
 #
@@ -302,7 +268,7 @@ function LogError ($msg)
 }
 
 # Check that docker is running on target machine
-task check-docker-running -depends force-docker-api-nas {
+task check-docker-running {
 
 	Try
 	{

@@ -5,4 +5,4 @@ services:
     image: application.api
     build:
       context: .
-      dockerfile: Application.Api/DockerfileLocalDebug
+      dockerfile: Application.Api/Dockerfile
